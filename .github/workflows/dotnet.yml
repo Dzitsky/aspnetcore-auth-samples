@@ -1,0 +1,38 @@
+name: .NET 5
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  ci:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.101
+    - name: create LDAP users
+      run: >
+        docker cp ldap/test.ldif "${{ job.services.openldap.id }}":/container/service/slapd/assets &&
+        docker exec "${{ job.services.openldap.id }}" ldapadd -x -D "cn=admin,dc=some-company,dc=local" -w So+QqZYY13p6 -f /container/service/slapd/assets/test.ldif -H ldap://localhost
+    - name: Build and test
+      run: dotnet test
+    services:
+      openldap:
+        image: osixia/openldap
+        ports:
+          - 389:389
+        env:
+          LDAP_DOMAIN: some-company.local
+          LDAP_ADMIN_PASSWORD: So+QqZYY13p6
+          LDAP_READONLY_USER: true
+          LDAP_READONLY_USER_USERNAME: readonly
+          LDAP_READONLY_USER_PASSWORD: w_pJlB8JccJ2Uw
+          LDAP_TLS: false

@@ -1,0 +1,29 @@
+# application user
+dn: cn=appuser,dc=some-company,dc=local
+objectClass: person
+sn: appuser
+cn: appuser
+userPassword: CbEkn_0NNF1
+memberOf: cn=appusers,dc=some-company,dc=local
+memberOf: cn=group2,dc=some-company,dc=local
+
+# user2
+dn: cn=user2,dc=some-company,dc=local
+objectClass: person
+sn: user2
+cn: user2
+userPassword: Bu_6X2yULfs
+memberOf: cn=group2,dc=some-company,dc=local
+
+# application user group
+dn: cn=appusers,dc=some-company,dc=local
+objectClass: groupOfNames
+cn: appusers
+member: cn=appuser,dc=some-company,dc=local
+
+# group2
+dn: cn=group2,dc=some-company,dc=local
+objectClass: groupOfNames
+cn: group2
+member: cn=appuser,dc=some-company,dc=local
+member: cn=user2,dc=some-company,dc=local
