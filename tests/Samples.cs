@@ -16,11 +16,17 @@ using Shouldly;
 
 namespace Authorization.Tests
 {
-    public class Tests
+    public class Samples
     {
-        private IHost host;
         private CancellationTokenSource cancel;
-        
+        private IHost host;
+
+        private AuthenticationHeaderValue AppUser => new("Basic",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes("appuser:CbEkn_0NNF1")));
+
+        private AuthenticationHeaderValue User2 => new("Basic",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes("user2:Bu_6X2yULfs")));
+
         [SetUp]
         public void Setup()
         {
@@ -47,15 +53,14 @@ namespace Authorization.Tests
             var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
             using var client = server.CreateClient();
 
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.UTF8.GetBytes("appuser:CbEkn_0NNF1")));
+            client.DefaultRequestHeaders.Authorization = AppUser;
             var res = await client.GetStringAsync("sample");
-            
+
             res.ShouldBe("Hello, appuser");
 
             await host.StopAsync(cancel.Token);
         }
-        
+
         [Test]
         public async Task ShouldCheckRole()
         {
@@ -64,10 +69,41 @@ namespace Authorization.Tests
             var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
             using var client = server.CreateClient();
 
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.UTF8.GetBytes("user2:Bu_6X2yULfs")));
+            client.DefaultRequestHeaders.Authorization = User2;
             var res = await client.GetAsync("sample");
-            
+
+            res.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+            await host.StopAsync(cancel.Token);
+        }
+
+        [Test]
+        public async Task ShouldShowTelephoneNumber()
+        {
+            await host.StartAsync(cancel.Token);
+
+            var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
+            using var client = server.CreateClient();
+
+            client.DefaultRequestHeaders.Authorization = User2;
+            var res = await client.GetStringAsync("telephone_number");
+
+            res.ShouldBe("Your telephone number is 99625382");
+
+            await host.StopAsync(cancel.Token);
+        }
+
+        [Test]
+        public async Task ShouldCheckTelephoneNumberClaim()
+        {
+            await host.StartAsync(cancel.Token);
+
+            var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
+            using var client = server.CreateClient();
+
+            client.DefaultRequestHeaders.Authorization = AppUser;
+            var res = await client.GetAsync("telephone_number");
+
             res.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
 
             await host.StopAsync(cancel.Token);

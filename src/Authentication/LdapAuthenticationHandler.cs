@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -10,16 +11,23 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Novell.Directory.Ldap;
 
-namespace Authorization.Samples
+namespace Authorization.Samples.Authentication
 {
     public class LdapAuthenticationHandler : AuthenticationHandler<LdapAuthenticationOptions>
     {
         private const string MemberOfAttribute = "memberOf";
         private const string CnAttribute = "cn";
 
-        public LdapAuthenticationHandler(IOptionsMonitor<LdapAuthenticationOptions> options, ILoggerFactory logger,
-            UrlEncoder encoder, ISystemClock clock) : base(options, logger, encoder, clock)
+        private readonly ILdapConnection _connection;
+
+        public LdapAuthenticationHandler(
+            ILdapConnection connection,
+            IOptionsMonitor<LdapAuthenticationOptions> options,
+            ILoggerFactory logger,
+            UrlEncoder encoder,
+            ISystemClock clock) : base(options, logger, encoder, clock)
         {
+            _connection = connection;
         }
 
         private (string username, string password) ReadCredentials(string basic)
@@ -37,32 +45,34 @@ namespace Authorization.Samples
 
             var config = OptionsMonitor.CurrentValue;
             var (username, password) = ReadCredentials(authorization);
-            using var connection = new LdapConnection();
 
             using (Logger.BeginScope(new { config.Host }))
+            {
                 Logger.LogDebug("Connecting LDAP server...");
+            }
 
-            connection.Connect(config.Host, LdapConnection.DefaultPort);
+            _connection.Connect(config.Host, LdapConnection.DefaultPort);
 
             using (Logger.BeginScope(new { config.BindDn }))
+            {
                 Logger.LogDebug("Binding...");
+            }
 
-            connection.Bind(config.BindDn, config.Password);
+            _connection.Bind(config.BindDn, config.Password);
 
             var searchFilter = string.Format(config.SearchFilter, username);
 
             using (Logger.BeginScope(new { searchFilter }))
+            {
                 Logger.LogDebug("Searching...");
+            }
 
-            var result = connection.Search(
+            var result = _connection.Search(
                 config.SearchBase,
                 LdapConnection.ScopeSub,
                 searchFilter,
-                new[]
-                {
-                    CnAttribute,
-                    MemberOfAttribute
-                },
+                (config.AdditionalClaimAttributes ?? Array.Empty<string>()).Append(CnAttribute)
+                .Append(MemberOfAttribute).ToArray(),
                 false
             );
 
@@ -73,33 +83,31 @@ namespace Authorization.Samples
 
             try
             {
-                connection.Bind(user.Dn, password);
+                _connection.Bind(user.Dn, password);
             }
             catch (LdapException)
             {
                 return AuthenticateResult.Fail("Invalid credentials");
             }
 
-            var cn = user.GetAttribute(CnAttribute);
-            if (cn == null)
-            {
-                return AuthenticateResult.Fail("Problem with your account, contact administrator");
-            }
+            var attributes = user.GetAttributeSet();
+            var cn = attributes[CnAttribute];
+            var claims = new List<Claim> { new(ClaimTypes.Name, cn.StringValue) };
 
-            var memberAttr = user.GetAttribute(MemberOfAttribute);
-            if (memberAttr == null)
-            {
-                return AuthenticateResult.Fail("Problem with your account, contact administrator");
-            }
+            if (attributes.TryGetValue(MemberOfAttribute, out var memberAttr))
+                claims.AddRange(from g in memberAttr.StringValueArray
+                    let match = Regex.Match(g, "^CN=([^,]*)", RegexOptions.IgnoreCase)
+                    where match.Success
+                    select new Claim(ClaimTypes.Role, match.Groups[1].Value));
 
-            var claims = (from g in memberAttr.StringValueArray
-                let match = Regex.Match(g, "^CN=([^,]*)", RegexOptions.IgnoreCase)
-                where match.Success
-                select new Claim("role", match.Groups[1].Value)).Append(new Claim("name", cn.StringValue));
-            var identity = new ClaimsIdentity(claims, nameof(LdapAuthenticationHandler), "name", "role");
+            claims.AddRange(from attribute in config.AdditionalClaimAttributes
+                let attr = attributes.TryGetValue(attribute, out var a) ? a : null
+                where attr != null
+                select new Claim(attribute, attr.StringValue));
 
-            return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity),
-                "Basic"));
+            var identity = new ClaimsIdentity(claims, nameof(LdapAuthenticationHandler));
+
+            return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name));
         }
     }
 }

@@ -13,6 +13,7 @@ objectClass: person
 sn: user2
 cn: user2
 userPassword: Bu_6X2yULfs
+telephoneNumber: 99625382
 memberOf: cn=group2,dc=some-company,dc=local
 
 # application user group
