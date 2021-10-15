@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Security.Claims;
 using Authorization.Samples.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -23,17 +25,30 @@ namespace Authorization.Samples
         {
             services.Configure<LdapAuthenticationOptions>(Configuration.GetSection("Ldap"));
 
-            services.AddAuthentication(LdapAuthenticationConstants.Scheme).AddLdap();
+            services.AddAuthentication(AuthenticationSchemes.Ldap).AddLdap();
 
             services.AddAuthorization(op =>
             {
                 op.DefaultPolicy =
-                    new AuthorizationPolicyBuilder(LdapAuthenticationConstants.Scheme).RequireAuthenticatedUser()
+                    new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap).RequireAuthenticatedUser()
                         .Build();
-                op.AddPolicy("RequireTelephoneNumber",
-                    new AuthorizationPolicyBuilder(LdapAuthenticationConstants.Scheme)
+                op.AddPolicy(Policies.RequireTelephoneNumber,
+                    new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
                         .RequireAuthenticatedUser()
-                        .RequireClaim("telephoneNumber")
+                        .RequireClaim(AppClaimTypes.TelephoneNumber)
+                        .Build());
+                op.AddPolicy(Policies.RequireGlobalAdminRealm,
+                    new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
+                        .RequireAuthenticatedUser()
+                        .RequireClaim(AppClaimTypes.AdminRealm, "global")
+                        .Build());
+                
+                op.AddPolicy(Policies.RequireAge18Plus,
+                    new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
+                        .RequireAuthenticatedUser()
+                        .RequireAssertion(context =>
+                            int.TryParse(context.User.Claims.FirstOrDefault(c => c.Type == AppClaimTypes.Age)?.Value,
+                                out var i) && i >= 18)
                         .Build());
             });
 
@@ -44,10 +59,12 @@ namespace Authorization.Samples
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
+            if (env.IsDevelopment())
+                app.UseDeveloperExceptionPage();
+            else
+                app.UseHsts();
 
             app.UseRouting();
-            app.UseWwwAuthenticateChallenge();
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseEndpoints(endpoints => endpoints.MapControllers());

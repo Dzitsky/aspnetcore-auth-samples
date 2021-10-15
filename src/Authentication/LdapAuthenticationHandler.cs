@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -37,6 +38,14 @@ namespace Authorization.Samples.Authentication
             return (auth[0], auth[1]);
         }
 
+        protected override Task HandleChallengeAsync(AuthenticationProperties properties)
+        {
+            Context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+            Context.Response.Headers.Add("WWW-Authenticate", "Basic");
+
+            return Task.CompletedTask;
+        }
+        
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             if (!Request.Headers.TryGetValue("Authorization", out var authorization) ||

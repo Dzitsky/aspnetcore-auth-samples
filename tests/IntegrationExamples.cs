@@ -16,7 +16,9 @@ using Shouldly;
 
 namespace Authorization.Tests
 {
-    public class Samples
+    // To make samples work:
+    // docker run --rm -it --name openldap -p 389:389 -e LDAP_DOMAIN="some-company.local" -e LDAP_ADMIN_PASSWORD="So+QqZYY13p6" -e LDAP_READONLY_USER=true -e LDAP_READONLY_USER_USERNAME="readonly" -e LDAP_READONLY_USER_PASSWORD="w_pJlB8JccJ2Uw" -e LDAP_TLS=false -v "$PWD/../ldap":/container/service/slapd/assets/config/bootstrap/ldif/custom osixia/openldap --copy-service
+    public class IntegrationExamples
     {
         private CancellationTokenSource cancel;
         private IHost host;
