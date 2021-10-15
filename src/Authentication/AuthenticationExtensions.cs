@@ -14,5 +14,12 @@ namespace Authorization.Samples.Authentication
                 AuthenticationSchemes.Ldap,
                 _ => { });
         }
+
+        public static AuthenticationBuilder AddCustomJwtToken(this AuthenticationBuilder builder)
+        {
+            return builder.AddScheme<JwtSchemeOptions, JwtSchemeHandler>(
+                AuthenticationSchemes.AppJwt,
+                _ => { });
+        }
     }
 }

@@ -1,6 +1,5 @@
-using System.Linq;
-using System.Security.Claims;
 using Authorization.Samples.Authentication;
+using Authorization.Samples.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -24,8 +23,11 @@ namespace Authorization.Samples
         public void ConfigureServices(IServiceCollection services)
         {
             services.Configure<LdapAuthenticationOptions>(Configuration.GetSection("Ldap"));
+            services.Configure<JwtSchemeOptions>(Configuration.GetSection("Jwt"));
 
-            services.AddAuthentication(AuthenticationSchemes.Ldap).AddLdap();
+            services.AddAuthentication(AuthenticationSchemes.Ldap)
+                .AddLdap()
+                .AddCustomJwtToken();
 
             services.AddAuthorization(op =>
             {
@@ -35,24 +37,23 @@ namespace Authorization.Samples
                 op.AddPolicy(Policies.RequireTelephoneNumber,
                     new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
                         .RequireAuthenticatedUser()
-                        .RequireClaim(AppClaimTypes.TelephoneNumber)
+                        .AddRequirements(new HasAllAdditionalAttributesRequirement())
                         .Build());
                 op.AddPolicy(Policies.RequireGlobalAdminRealm,
                     new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
                         .RequireAuthenticatedUser()
                         .RequireClaim(AppClaimTypes.AdminRealm, "global")
                         .Build());
-                
+
                 op.AddPolicy(Policies.RequireAge18Plus,
                     new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
                         .RequireAuthenticatedUser()
-                        .RequireAssertion(context =>
-                            int.TryParse(context.User.Claims.FirstOrDefault(c => c.Type == AppClaimTypes.Age)?.Value,
-                                out var i) && i >= 18)
+                        .AddRequirements(new MinAgeRequirement(18))
                         .Build());
             });
 
-
+            services.AddTransient<IAuthorizationHandler, AgeAuthorizationHandler>();
+            services.AddTransient<IAuthorizationHandler, HasAllAdditionalAttributesAuthorizationHandler>();
             services.AddControllers();
         }
 

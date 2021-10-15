@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using Shouldly;
 
@@ -45,6 +46,25 @@ namespace Authorization.Tests
         {
             host.Dispose();
             cancel.Dispose();
+        }
+
+        [Test]
+        public async Task ShouldAuthorizeJwt()
+        {
+            await host.StartAsync(cancel.Token);
+
+            var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
+            using var client = server.CreateClient();
+
+            var dd = JToken.Parse(Encoding.UTF8.GetString(Convert.FromBase64String("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")));
+            // Tokens can be generated at https://jwt.io/
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.C_oJC0CHkDiV1yT_Wiij5IfQqDgPylMhMKhd32H_CoQ");
+            var res = await client.GetStringAsync("jwt_hello");
+
+            res.ShouldBe("Hello, John Doe!");
+
+            await host.StopAsync(cancel.Token);
         }
 
         [Test]

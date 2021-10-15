@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Authorization.Samples.Controllers
 {
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Social)]
-    public class GoogleController : Controller
+    public class SocialController : Controller
     {
         [HttpGet("social_hello")]
         public string AdminHello()

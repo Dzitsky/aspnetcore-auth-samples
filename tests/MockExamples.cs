@@ -79,6 +79,31 @@ namespace Authorization.Tests
             res.ShouldBe($"Hello, {username}");
         }
 
+        
+        [Test]
+        [TestCase("2324321")]
+        public async Task ShouldAuthorizeWithAdditionalClaim(string telephoneNumber)
+        {
+            TestAuthenticationHandler.SetupSuccess(AuthenticationSchemes.Ldap,
+                new Claim(ClaimTypes.Name, "user1"),
+                new Claim(AppClaimTypes.TelephoneNumber, telephoneNumber));
+
+            var res = await _client.GetStringAsync("telephone_number");
+
+            res.ShouldContain(telephoneNumber);
+        }
+
+        [Test]
+        public async Task ShouldNotAuthorizeWithoutAdditionalClaim()
+        {
+            TestAuthenticationHandler.SetupSuccess(AuthenticationSchemes.Ldap,
+                new Claim(ClaimTypes.Name, "user1"));
+
+            var res = await _client.GetAsync("telephone_number");
+
+            res.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
+
         [Test]
         public async Task ShouldNotAuthorizeWithoutRole()
         {
