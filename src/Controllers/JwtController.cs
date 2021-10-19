@@ -13,5 +13,14 @@ namespace Authorization.Samples.Controllers
         {
             return $"Hello, {User.Claims.Single(c => c.Type == "name").Value}!";
         }
+
+        [HttpGet("jwt_one_time")]
+        [Authorize(Policies.RequireOneTimeJwtToken)]
+        public string CheckOneTime()
+        {
+            var uid = User.Claims.First(c => c.Type == "uid").Value;
+
+            return $"Successfully verified token with uid {uid}.";
+        }
     }
 }

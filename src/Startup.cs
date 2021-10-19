@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.VisualStudio.Threading;
+using StackExchange.Redis;
 
 namespace Authorization.Samples
 {
@@ -50,10 +52,26 @@ namespace Authorization.Samples
                         .RequireAuthenticatedUser()
                         .AddRequirements(new MinAgeRequirement(18))
                         .Build());
+
+                op.AddPolicy(Policies.RequireOneTimeJwtToken,
+                    new AuthorizationPolicyBuilder(AuthenticationSchemes.AppJwt)
+                        .RequireAuthenticatedUser()
+                        .AddRequirements(new OneTimeJwtTokenRequirement("token."))
+                        .Build());
             });
+
+            services.AddSingleton(_ => new AsyncLazy<IConnectionMultiplexer>(async () =>
+                await ConnectionMultiplexer.ConnectAsync(Configuration["Redis:Configuration"])));
+            services.AddSingleton(c => new AsyncLazy<IDatabaseAsync>(async () =>
+            {
+                var connection = await c.GetRequiredService<AsyncLazy<IConnectionMultiplexer>>().GetValueAsync();
+
+                return connection.GetDatabase();
+            }));
 
             services.AddTransient<IAuthorizationHandler, AgeAuthorizationHandler>();
             services.AddTransient<IAuthorizationHandler, HasAllAdditionalAttributesAuthorizationHandler>();
+            services.AddTransient<IAuthorizationHandler, OneTimeJwtTokenAuthorizationHandler>();
             services.AddControllers();
         }
 

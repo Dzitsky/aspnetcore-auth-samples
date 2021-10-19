@@ -66,6 +66,28 @@ namespace Authorization.Tests
 
             await host.StopAsync(cancel.Token);
         }
+        
+        
+        [Test]
+        public async Task ShouldCheckOneTimeJwt()
+        {
+            await host.StartAsync(cancel.Token);
+
+            var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
+            using var client = server.CreateClient();
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJ1aWQiOiJYdUFIcm1FdEc5alYifQ._8C_iIPPRhxUNgQen8wE6Q2RZ_fLh-SiWVxsQxzYPow");
+            var res = await client.GetStringAsync("jwt_one_time");
+
+            res.ShouldContain("XuAHrmEtG9jV");
+
+            await host.StopAsync(cancel.Token);
+            
+            var res2 = await client.GetAsync("jwt_one_time");
+
+            res2.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
 
         [Test]
         public async Task ShouldAuthorize()
