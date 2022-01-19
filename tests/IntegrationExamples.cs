@@ -6,14 +6,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Authorization.Samples;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualStudio.Threading;
+using Moq;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using Shouldly;
+using StackExchange.Redis;
+using IServer = Microsoft.AspNetCore.Hosting.Server.IServer;
 
 namespace Authorization.Tests
 {
@@ -23,6 +26,7 @@ namespace Authorization.Tests
     {
         private CancellationTokenSource cancel;
         private IHost host;
+        private Mock<IDatabaseAsync> redis;
 
         private AuthenticationHeaderValue AppUser => new("Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes("appuser:CbEkn_0NNF1")));
@@ -33,9 +37,11 @@ namespace Authorization.Tests
         [SetUp]
         public void Setup()
         {
+            redis = new Mock<IDatabaseAsync>();
             host = Host.CreateDefaultBuilder()
                 .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>().UseTestServer())
                 .ConfigureServices(services => services
+                    .AddTransient(_ => new AsyncLazy<IDatabaseAsync>(() => Task.FromResult(redis.Object)))
                     .AddLogging(op => op.ClearProviders().AddNUnit()))
                 .Build();
             cancel = new CancellationTokenSource(10_000);
@@ -51,12 +57,15 @@ namespace Authorization.Tests
         [Test]
         public async Task ShouldAuthorizeJwt()
         {
+            redis.Setup(r => r.StringGetSetAsync(It.IsAny<RedisKey>(), true, It.IsAny<CommandFlags>()))
+                .ReturnsAsync((bool?)null);
             await host.StartAsync(cancel.Token);
 
             var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
             using var client = server.CreateClient();
 
-            var dd = JToken.Parse(Encoding.UTF8.GetString(Convert.FromBase64String("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")));
+            var dd = JToken.Parse(
+                Encoding.UTF8.GetString(Convert.FromBase64String("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")));
             // Tokens can be generated at https://jwt.io/
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.C_oJC0CHkDiV1yT_Wiij5IfQqDgPylMhMKhd32H_CoQ");
@@ -66,11 +75,17 @@ namespace Authorization.Tests
 
             await host.StopAsync(cancel.Token);
         }
-        
-        
+
+
         [Test]
         public async Task ShouldCheckOneTimeJwt()
         {
+            redis.Setup(r => r.StringGetSetAsync(It.IsAny<RedisKey>(), true, It.IsAny<CommandFlags>()))
+                .ReturnsAsync((bool?)null)
+                .Callback(() =>
+                    redis.Setup(r => r.StringGetSetAsync(It.IsAny<RedisKey>(), true, It.IsAny<CommandFlags>()))
+                        .ReturnsAsync((bool?)true));
+
             await host.StartAsync(cancel.Token);
 
             var server = host.Services.GetRequiredService<IServer>().ShouldBeOfType<TestServer>();
@@ -83,7 +98,7 @@ namespace Authorization.Tests
             res.ShouldContain("XuAHrmEtG9jV");
 
             await host.StopAsync(cancel.Token);
-            
+
             var res2 = await client.GetAsync("jwt_one_time");
 
             res2.StatusCode.ShouldBe(HttpStatusCode.Forbidden);

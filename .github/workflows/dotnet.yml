@@ -36,7 +36,3 @@ jobs:
           LDAP_READONLY_USER_USERNAME: readonly
           LDAP_READONLY_USER_PASSWORD: w_pJlB8JccJ2Uw
           LDAP_TLS: false
-      redis:
-        image: redis
-        ports:
-          - 6379:6379
