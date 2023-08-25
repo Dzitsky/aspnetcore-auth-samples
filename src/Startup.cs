@@ -28,11 +28,13 @@ namespace Authorization.Samples
             services.Configure<JwtSchemeOptions>(Configuration.GetSection("Jwt"));
 
             services.AddAuthentication(AuthenticationSchemes.Ldap)
-                .AddLdap()
+                /**/.AddLdap()
                 .AddCustomJwtToken();
 
             services.AddAuthorization(op =>
             {
+                #region Ldap Policy
+                /**/
                 op.DefaultPolicy =
                     new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap).RequireAuthenticatedUser()
                         .Build();
@@ -46,12 +48,13 @@ namespace Authorization.Samples
                         .RequireAuthenticatedUser()
                         .RequireClaim(AppClaimTypes.AdminRealm, "global")
                         .Build());
-
                 op.AddPolicy(Policies.RequireAge18Plus,
                     new AuthorizationPolicyBuilder(AuthenticationSchemes.Ldap)
                         .RequireAuthenticatedUser()
                         .AddRequirements(new MinAgeRequirement(18))
                         .Build());
+                /**/
+                #endregion
 
                 op.AddPolicy(Policies.RequireOneTimeJwtToken,
                     new AuthorizationPolicyBuilder(AuthenticationSchemes.AppJwt)
@@ -85,7 +88,7 @@ namespace Authorization.Samples
 
             app.UseRouting();
             app.UseAuthentication();
-            app.UseAuthorization();
+            /**/app.UseAuthorization();
             app.UseEndpoints(endpoints => endpoints.MapControllers());
         }
     }

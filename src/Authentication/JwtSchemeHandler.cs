@@ -60,7 +60,7 @@ namespace Authorization.Samples.Authentication
 
             var principal = new ClaimsPrincipal(identity);
 
-            var ticket = new AuthenticationTicket(principal, this.Scheme.Name);
+            AuthenticationTicket ticket = new AuthenticationTicket(principal, this.Scheme.Name);
 
             return AuthenticateResult.Success(ticket);
         }
